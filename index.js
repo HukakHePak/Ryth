@@ -1,4 +1,4 @@
-const { Client, Intents } = require('discord.js');
+const { Client, Intents, VoiceChannel} = require('discord.js');
 const { token } = require('./config.json');
 const { join } = require('path');
 
@@ -13,7 +13,8 @@ const { createAudioPlayer,
     NoSubscriberBehavior,
     joinVoiceChannel,
     createAudioResource,
-    getVoiceConnection} = require('@discordjs/voice');
+    getVoiceConnection, getGroups
+} = require('@discordjs/voice');
 
 const player = createAudioPlayer({
     behaviors: {
@@ -22,8 +23,13 @@ const player = createAudioPlayer({
 });
 
 
-//let resource = createAudioResource(join(__dirname, 'Minelli_-_Rampampam_72874060.mp3'));
-let resource = createAudioResource('//ru.hitmotop.com/get/music/20170831/Evanescence_-_Bring_Me_To_Life_47885099.mp3');
+let resource = createAudioResource(join(__dirname, 'Minelli_-_Rampampam_72874060.mp3'));
+// let resource = createAudioResource('//ru.hitmotop.com/get/music/20170831/Evanescence_-_Bring_Me_To_Life_47885099.mp3',
+//     {
+//         metadata: {
+//             title: 'A good song!',
+//         }
+//     });
 
 let connection = undefined;
 
@@ -51,10 +57,24 @@ client.on('guildMemberRemove', action => {
     action.reply('We have lost a worthy fighter. Rest in peace...');
 });
 
-client.on('messageCreate', message => {
+client.on('messageCreate', async message => {
     if(message.author.username === 'Ruth Simple') return;
 
     console.log('message read');
+    //console.log(message);
+    let channels = await message.guild.channels.fetch();
+    //let channel = manager.fetch();
+    //console.log(channels);
+    let voice = channels.find(channel => channel.isVoice() &&
+        channel.members.find(member => member.user.username === message.author.username));
+
+    //console.log(voice);
+    //channels.each(console.log);
+
+    /////////////////////////////////
+
+
+
 
     const messageContent = message.content.trim().toLowerCase();
     const userName = message.author.username;
@@ -65,8 +85,11 @@ client.on('messageCreate', message => {
             message.reply('😄');
             break;
         case 'ruth.play':
+
+            //let guild = client.guilds.resolve()
+
             connection = joinVoiceChannel({
-                channelId: '925690962783645720',
+                channelId: voice.id,
                 guildId: message.guild.id,
                 adapterCreator: message.guild.voiceAdapterCreator,
             });
@@ -80,13 +103,13 @@ client.on('messageCreate', message => {
             console.log('music play');
             break;
         case 'ruth.dream':
-            if(connection) connection.destroy();
+            //if(connection.status == '') connection.destroy();
 
             console.log('bot stop');
             client.destroy();
             break;
         case 'ruth.stop':
-            if(connection) connection.destroy();
+            if(connection.status) connection.destroy();
             console.log('music stop');
     }
 });
