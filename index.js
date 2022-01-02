@@ -1,6 +1,8 @@
 const { Client, Intents, VoiceChannel} = require('discord.js');
 const { token } = require('./config.json');
 const { join } = require('path');
+const { createReadStream } = require('fs');
+const ytdl = require('ytdl-core');
 
 const client = new Client({
     intents: [Intents.FLAGS.GUILDS,
@@ -13,7 +15,9 @@ const { createAudioPlayer,
     NoSubscriberBehavior,
     joinVoiceChannel,
     createAudioResource,
-    getVoiceConnection, getGroups
+    getVoiceConnection,
+    getGroups,
+    StreamType
 } = require('@discordjs/voice');
 
 const player = createAudioPlayer({
@@ -23,7 +27,12 @@ const player = createAudioPlayer({
 });
 
 
-let resource = createAudioResource(join(__dirname, 'Minelli_-_Rampampam_72874060.mp3'));
+//let resource = createAudioResource(join(__dirname, 'Minelli_-_Rampampam_72874060.mp3'));
+
+// let resource = createAudioResource(createReadStream('./Minelli_-_Rampampam_72874060.mp3'), {
+//     inputType: StreamType.Arbitrary,
+// });
+
 // let resource = createAudioResource('//ru.hitmotop.com/get/music/20170831/Evanescence_-_Bring_Me_To_Life_47885099.mp3',
 //     {
 //         metadata: {
@@ -87,6 +96,10 @@ client.on('messageCreate', async message => {
         case 'ruth.play':
 
             //let guild = client.guilds.resolve()
+            const stream = ytdl('https://www.youtube.com/watch?v=w3LWHIz3bMc', { filter: 'audioonly' });
+
+            const resource = createAudioResource(stream, { inputType: StreamType.WebmOpus});
+
 
             connection = joinVoiceChannel({
                 channelId: voice.id,
@@ -99,18 +112,30 @@ client.on('messageCreate', async message => {
             const subscription = connection.subscribe(player);
 
             if(userName === 'Hukak He Pak') message.reply('Oh, yes, my overlord');
+
             console.log('voice connect');
             console.log('music play');
             break;
+
         case 'ruth.dream':
             //if(connection.status == '') connection.destroy();
 
             console.log('bot stop');
+            message.reply('Bye ^w^');
+
+            //connection.destroy();
             client.destroy();
+            process.exit();
             break;
+
         case 'ruth.stop':
             if(connection.status) connection.destroy();
             console.log('music stop');
+            break;
+
+        case '🍌':
+            message.reply('💦');
+            break;
     }
 });
 
