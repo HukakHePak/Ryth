@@ -94,15 +94,23 @@ client.on('messageCreate', async message => {
 
             player.play(resource);
 
-            player.on('stateChange', async playerState => {
-                console.log(playerState);
-                stream = await play.stream('https://www.youtube.com/watch?v=w3LWHIz3bMc');
-                resource = createAudioResource(stream.stream, { inputType: stream.type} );
-            })
+            let counter = 0;
 
+            player.on('stateChange', async playerState => {
+
+                if(playerState.status  === 'buffering') return;
+
+                console.log(counter++ +' ' + playerState.status);
+
+                if(playerState.status === 'playing') {
+                    stream = await play.stream('https://www.youtube.com/watch?v=w3LWHIz3bMc');
+                    resource = createAudioResource(stream.stream, { inputType: stream.type} );
+                    //player.play(resource);
+                    console.log(stream);
+                }
+            });
 
             const subscription = connection.subscribe(player);
-
 
             if(userName === 'Hukak He Pak') message.reply('Oh, yes, my overlord');
 
