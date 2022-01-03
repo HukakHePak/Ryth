@@ -1,7 +1,7 @@
 const { Client, Intents, VoiceChannel} = require('discord.js');
 const { token } = require('./config.json');
-const { join } = require('path');
-const { createReadStream } = require('fs');
+const { createReadStream, createWriteStream } = require('fs');
+const play = require('play-dl');
 const ytdl = require('ytdl-core');
 
 const client = new Client({
@@ -26,30 +26,25 @@ const player = createAudioPlayer({
     },
 });
 
-
-//let resource = createAudioResource(join(__dirname, 'Minelli_-_Rampampam_72874060.mp3'));
-
 // let resource = createAudioResource(createReadStream('./Minelli_-_Rampampam_72874060.mp3'), {
 //     inputType: StreamType.Arbitrary,
 // });
-
-// let resource = createAudioResource('//ru.hitmotop.com/get/music/20170831/Evanescence_-_Bring_Me_To_Life_47885099.mp3',
-//     {
-//         metadata: {
-//             title: 'A good song!',
-//         }
-//     });
-
-let connection = undefined;
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
     const { commandName } = interaction;
 
-    if (commandName === 'react') {
-        const message = await interaction.reply({ content: 'You can react with Unicode emojis!', fetchReply: true });
-        message.react('😄');
+    switch (commandName) {
+        case 'react':
+            const message = await interaction.reply({ content: 'You can react with Unicode emojis!', fetchReply: true });
+            message.react('😄');
+            break;
+        case 'test':
+            interaction.reply('status: ok');
+            console.log(interaction);
+            break;
+
     }
 });
 
@@ -66,50 +61,48 @@ client.on('guildMemberRemove', action => {
     action.reply('We have lost a worthy fighter. Rest in peace...');
 });
 
+let connection = undefined;
+
 client.on('messageCreate', async message => {
-    if(message.author.username === 'Ruth Simple') return;
+    if(message.author.bot) return;
 
     console.log('message read');
-    //console.log(message);
-    let channels = await message.guild.channels.fetch();
-    //let channel = manager.fetch();
-    //console.log(channels);
-    let voice = channels.find(channel => channel.isVoice() &&
-        channel.members.find(member => member.user.username === message.author.username));
-
-    //console.log(voice);
-    //channels.each(console.log);
-
-    /////////////////////////////////
-
-
-
 
     const messageContent = message.content.trim().toLowerCase();
     const userName = message.author.username;
 
     switch (messageContent) {
         case 'hi, ruth':
-            message.reply('Hi ' + userName + ', glad to see you!');
-            message.reply('😄');
+            message.reply('Hi ' + userName + ', glad to see you! 😄');
+            //message.reply('😄');
             break;
         case 'ruth.play':
 
-            //let guild = client.guilds.resolve()
-            const stream = ytdl('https://www.youtube.com/watch?v=w3LWHIz3bMc', { filter: 'audioonly' });
+            // let resource = await createAudioResource('//ru.hitmotop.com/get/music/20170831/Evanescence_-_Bring_Me_To_Life_47885099.mp3', {
+            //     metadata: 'StreamType.Arbitrary',
+            // });
 
-            const resource = createAudioResource(stream, { inputType: StreamType.WebmOpus});
+            let stream = await play.stream('https://www.youtube.com/watch?v=w3LWHIz3bMc');
 
+            let resource = createAudioResource(stream.stream, { inputType: stream.type} );
 
-            connection = joinVoiceChannel({
-                channelId: voice.id,
+            connection = await joinVoiceChannel({
+                channelId: message.member.voice.channelId,
                 guildId: message.guild.id,
                 adapterCreator: message.guild.voiceAdapterCreator,
             });
 
             player.play(resource);
 
+            player.on('stateChange', async playerState => {
+                console.log(playerState);
+                stream = await play.stream('https://www.youtube.com/watch?v=w3LWHIz3bMc');
+                resource = createAudioResource(stream.stream, { inputType: stream.type} );
+            })
+
+
             const subscription = connection.subscribe(player);
+
 
             if(userName === 'Hukak He Pak') message.reply('Oh, yes, my overlord');
 
@@ -118,27 +111,47 @@ client.on('messageCreate', async message => {
             break;
 
         case 'ruth.dream':
-            //if(connection.status == '') connection.destroy();
 
             console.log('bot stop');
-            message.reply('Bye ^w^');
+            await message.reply('Bye ☺️');
 
-            //connection.destroy();
+            if(connection)  {
+                connection.disconnect();
+                connection = undefined;
+            }
+
             client.destroy();
             process.exit();
             break;
 
         case 'ruth.stop':
-            if(connection.status) connection.destroy();
+            if(connection)  {
+                connection.disconnect();
+                connection = undefined;
+            }
+
             console.log('music stop');
+            break;
+
+        case 'ruth.test':
+            message.reply('status: ok');
+            console.log(message);
+
             break;
 
         case '🍌':
             message.reply('💦');
             break;
+
     }
 });
 
 client.login(token);
 
 console.log('bot start');
+
+// TODO: replace admin name in global, add audio-streams support, add link music support, add vk playlist music support,
+// TODO: create server playlists, add some radios, create music manager, fix connection destroy null exceptions
+
+// now //restart stream-play every source finish
+// TODO: fix stream ends, add
