@@ -13,24 +13,6 @@ const { createAudioPlayer,
     StreamType
 } = require('@discordjs/voice');
 
-const BOT = {
-    NAME: 'ryth',
-    OWNER: 'Hukak He Pak',
-    PHRASE: {
-        MEMBER: {
-            JOIN: '',
-            LEAVE: '',
-        }
-    },
-
-    GUILD: {
-        MEMBER: {
-            WELCOME: 'Congratulations and welcome to the server! I believe that a strong group of People can do much more together and surpass what an individual can do alone',
-            BYE: '',
-        }
-    },
-}
-
 const client = new Client({ intents: [Intents.FLAGS.GUILDS,
         Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
         Intents.FLAGS.GUILD_MESSAGES,
@@ -41,88 +23,75 @@ let connection = undefined;
 
 const player = new Player(client);
 
-player.on("trackStart", (queue, track) => queue.metadata.channel.send(`🎶    |   Now playing ** ${track.title} **!`))
+const BOT = {
+    NAME: 'ryth',
+    OWNER: 'Hukak He Pak',
+    PHRASE: {
+        MEMBER: {
+            JOIN: 'Congratulations and welcome to the server! I believe that a strong group of People can do much more together and surpass what an individual can do alone',
+            LEAVE: 'We have lost a worthy fighter. Rest in peace...',
+            HELLO(userName) { return 'Hi ' + userName + ', glad to see you! 😄'},
+        },
+        OWNER: {
+            HELLO: 'Oh, yes, my overlord',
+        },
+        PLAYER: {
+            START(title) { return `🎶 | Now playing **${title}**!`; },
+        },
+        DREAM: 'Bye ☺️',
+        BANANA: '💦',
+    },
+    PLAYLIST: {
+      OPEN: false,
+      LAST: '',
 
-client.once("ready", () => {
-    console.log("I'm ready!");
-});
 
-/////////////////////////////////////////////////////////
+    },
 
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isCommand()) return;
+    GUILD: {
+        MEMBER: {
 
-    const { commandName } = interaction;
+        }
+    },
 
-    switch (commandName) {
-        case 'react':
-            const message = await interaction.reply({ content: 'You can react with Unicode emojis!', fetchReply: true });
-            message.react('😄');
-            break;
-        case 'test':
-            interaction.reply('status: ok');
-            //console.log(interaction);
-            break;
+    PLAYER: undefined,
+    QUEUE: undefined,
+    PLAYLISTS: [],
 
-    }
-});
+}
 
-client.on('guildMemberAdd', action => {
-    action.reply(BOT.PHRASE.MEMBER.JOIN);
-});
+async function messageReact(message) {
+    if (message.author.bot) return;
 
-client.on('guildMemberRemove', action => {
-    action.reply('We have lost a worthy fighter. Rest in peace...');
-});
-
-client.on('messageCreate', async message => {
-    if(message.author.bot) return;
-
-    const messageContent = message.content.trim().toLowerCase();
     const userName = message.author.username;
+    const messageCrumbs = message.content.trim().toLowerCase().split(' ');
 
-    if(messageContent.includes(BOT.NAME)) {
+    switch (messageCrumbs[0]) {
+        case BOT.NAME:
+            await managePlayer(message, messageCrumbs.slice(1));
+            break;
+        case '🍌':
+            message.reply(BOT.PHRASE.BANANA);
+            break;
+
+        case 'hi,':
+            if(messageCrumbs[1] === BOT.NAME) message.reply(BOT.PHRASE.MEMBER.HELLO(userName));
+            break;
+
+        // check messageCrumbs[1] in playlists/internet search
 
     }
+}
 
-    switch (messageContent) {
-        case `hi, ${BOT.NAME}`:
-            message.reply('Hi ' + userName + ', glad to see you! 😄');
+async function managePlayer(message, [ firstCrumb, secondCrumb]) {
+    switch (firstCrumb) {
+        case 'play':
+            startPlayer(message);
+
+            if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.HELLO);
             break;
 
-        case `${BOT.NAME}.play`:
-
-            const queue = player.createQueue(message.guild, {
-                metadata: {
-                    channel: message.channel
-                }
-            });
-
-            await  queue.connect(message.member.voice.channel);
-
-            const track = new Track(player, { url: 'https://www.youtube.com/watch?v=w3LWHIz3bMc', source: 'youtube'});
-
-            await queue.play(track);
-
-            if(userName === BOT.OWNER) message.reply('Oh, yes, my overlord');
-
-            break;
-
-        case `${BOT.NAME}.dream`:
-
-            console.log('bot stop');
-            await message.reply('Bye ☺️');
-
-            if(connection)  {
-                connection.disconnect();
-                connection = undefined;
-            }
-
-            client.destroy();
-            process.exit();
-            break;
-
-        case `${BOT.NAME}.stop`:
+        case 'stop':
             if(connection)  {
                 connection.disconnect();
                 connection = undefined;
@@ -130,17 +99,74 @@ client.on('messageCreate', async message => {
             }
             break;
 
-        case '🍌':
-            message.reply('💦');
+        case 'pause':
+            break;
+
+        case 'next':
+            break;
+
+        case 'prev':
+            break;
+
+        case 'open':
+            break;
+
+        case 'to':
+            break;
+
+        case 'remove':
+            break;
+
+        case 'help':
+            break;
+
+        case 'dream':
+            if(message.author.username === BOT.OWNER) {
+                await message.reply(BOT.PHRASE.DREAM);
+
+                client.destroy();
+                process.exit();
+                return;
+            }
             break;
 
     }
+}
+
+async function startPlayer(message) {
+    const queue = player.createQueue(message.guild, {
+        metadata: {
+            channel: message.channel
+        }
+    });
+    await  queue.connect(message.member.voice.channel);
+    const track = new Track(player, { title: 'lo-fi', url: 'https://www.youtube.com/watch?v=w3LWHIz3bMc', source: 'youtube'});
+    await queue.play(track);
+}
+
+
+player.on("trackStart", (queue, track) =>
+    queue.metadata.channel.send(BOT.PHRASE.PLAYER.START(track.title))
+);
+
+client.on('messageCreate', messageReact);
+
+client.on('guildMemberAdd', action => {
+    action.reply(BOT.PHRASE.MEMBER.JOIN);
+});
+
+client.on('guildMemberRemove', action => {
+    action.reply(BOT.PHRASE.MEMBER.LEAVE);
+});
+
+client.once("ready", () => {
+    console.log("I'm ready!");
 });
 
 client.login(token);
 
-// TODO: replace admin name in global, add audio-streams support, add link music support, add vk playlist music support,
+// TODO: add link music support, add vk playlist music support,
 // TODO: create server playlists, add some radios, create music manager, fix connection destroy null exceptions
 
 // now //restart stream-play every source finish
-// TODO: fix stream ends, add
+// TODO: fix stream ends
