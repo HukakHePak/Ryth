@@ -1,6 +1,5 @@
 const { Client, Intents, VoiceChannel} = require('discord.js');
 const { token } = require('./config.json');
-//const { playlists } = require('./playlists.json');
 //const { createReadStream, createWriteStream } = require('fs');
 //const play = require('play-dl');
 const ytdl = require('ytdl-core');
@@ -20,11 +19,10 @@ const client = new Client({ intents: [Intents.FLAGS.GUILDS,
         Intents.FLAGS.GUILD_VOICE_STATES],
 });
 
-let connection = undefined;
-let queue = undefined;
-let radios = [];
-
-const player = new Player(client);
+// let connection = undefined;
+// let queue = undefined;
+//
+// const player = new Player(client);
 
 const BOT = {
     NAME: 'ryth',
@@ -42,36 +40,39 @@ const BOT = {
             START(title) { return `🎶 | Now playing **${title}**!`; },
             STOP: 'Player stopped',
         },
+        VOICE: {
+            DISCONNECT:'Not connect to voice'
+        },
         DREAM: 'Bye ☺️☺️☺️',
         BANANA: '💦',
-        HELP: '',
+        HELP: 'Do you need a help? Ha-ha!',
 
     },
     COMMANDS: ['play', 'skip', 'stop', 'back', 'to', 'remove', 'skip', 'list', 'help', 'dream'],
-
-    GUILD: {
-        QUEUE: undefined,
-        LIST: undefined,
+    DEFAULT: {
+        TRACK: createTrack('https://www.youtube.com/watch?v=w3LWHIz3bMc', 'anime'),
     },
-    //PLAYER: new Player(client),
+
+    PLAYLIST: new Map,
+    QUEUE: undefined,
+    PLAYER: new Player(client),
 }
 
 function parseContent(content) {
     let crumbs = content.trim().split(' ');
     const botName = crumbs[0].toLowerCase();
     let command = crumbs[1] ? crumbs[1].toLowerCase() : undefined;
-    let trackName = crumbs[2];
+    let title = crumbs[2];
 
     if(!BOT.COMMANDS.includes(command)) {
         command = undefined;
-        trackName = crumbs.filter(crumb => {
+        title = crumbs.filter(crumb => {
             return crumb !== BOT.NAME && !isUrl(crumb);
         }).join(' ');
     }
-
     const url = crumbs.find(isUrl);
 
-    return { botName, command, trackName, url };
+    return { botName, command, title, url };
 }
 
 async function messageReact(message) {
@@ -81,8 +82,18 @@ async function messageReact(message) {
 
     switch (crumbs.botName) {
         case BOT.NAME:
-            await managePlayer(message, crumbs);
+            if(!message.member.voice.channel) {
+                message.reply(BOT.PHRASE.VOICE.DISCONNECT);
+                return;
+            }
+
+            if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
+
+            if(!BOT.QUEUE) BOT.QUEUE = BOT.PLAYER.createQueue(message.guild, { repeatMode: 2 });
+
+            managePlayer(message, crumbs);
             break;
+
         case '🍌':
             message.reply(BOT.PHRASE.BANANA);
             break;
@@ -94,133 +105,93 @@ async function messageReact(message) {
     }
 }
 
-async function managePlayer(message, { command, trackName, url }) {
+async function managePlayer(message, { command, title, url }) {
+    const queue = BOT.QUEUE;
+    const playlist = BOT.PLAYLIST;
+
     switch (command) {
-        case 'play':
-            startPlayer(message);
-
-            //queue.play();
-            if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
-            return;
-
         case 'stop':
             queue.stop();
-            //queue.jump(0);
-            // if(connection)  {
-            //     stopPlayer();
-            //     message.reply(BOT.PHRASE.PLAYER.STOP)
-            // }
             return;
 
         case 'pause':
             queue.setPaused(true);
             return;
 
-        case 'skip':
-            queue.skip();
-            return;
-
-        case 'back':
-            try { queue.back(); } catch { }
+        case 'remove':
+            playlist.delete(title);
             return;
 
         case 'to':
-            //typeof trackName === 'number' ? trackName find track in queue
-            //queue.jump();
-            return;
-
-        case 'remove':
-            //queue.remove(trackName);
-            //radios.filter()
+            if(+title) queue.jump(+title);
             return;
 
         case 'list':
+            if(!queue || !playlist.size) return;
+
              let trackList = '';
              let count = 0;
 
-             queue.previousTracks.forEach( track => trackList += count++ + ' | ' + track.title + '\n' );
+            playlist.forEach( track => trackList += count++ + ' | ' + track.title + '\n' );
 
              if(trackList) message.reply(trackList);
             return;
 
         case 'help':
+            message.reply(BOT.PHRASE.HELP);
             return;
 
         case 'dream':
             if(message.author.username === BOT.OWNER) {
                 await message.reply(BOT.PHRASE.DREAM);
-                stopPlayer();
-                stopClient();
+                queue.stop();
+                client.destroy();
+                process.exit();
             }
             return;
-        default:
-            break;
+
+        case 'play':
+            if(playlist.size) {
+                queue.addTracks(Array.from(playlist.values()));
+                queue.play();
+            }
+            await queue.play(queue.tracks.size ? undefined : BOT.DEFAULT.TRACK);
+
     }
+
+    if(!queue.connection) await queue.connect(message.member.voice.channel);
+
+    let track = undefined;
 
     if(url) {
-        const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
-        const track = new Track(player, { title: trackName ? trackName : trackInfo.title, url: url, source: 'youtube' });
+        track = createTrack(url);
 
-        if(trackInfo.isLiveContent) {
-            radios.push(track);
+        if(title) {
+            playlist.set(title, track);
+            queue.clear();
             queue.play(track);
-        } else {
-            queue.addTrack(track);
-            queue.jump(track);
-        }
-
-    } else if (trackName) {
-        let isCurrentTrack = track => track.title === trackName;
-
-        let track = radios.find(isCurrentTrack);
-
-        if(track) queue.play(track);
-        else {
-            track = queue.tracks.find(isCurrentTrack);
-            if(track) queue.jump(track);
-            else {
-                track = await player.search(trackName, { requestedBy: message.author }).then(response => response.tracks[0]);
-                queue.addTrack(track);
-                queue.jump(track);
-            }
+            return;
         }
     }
 
+    if(title) {
+        track = BOT.PLAYLIST.get(title);
+
+        if(!track)
+            track = await BOT.PLAYER.search(title, { requestedBy: message.author }).then(response => response.tracks[0]);
+    }
+
+    queue.addTrack(track);
+}
+
+async function createTrack(url) {
+    const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
+    return new Track(player, { title: trackInfo.title, url, source: 'youtube', live: trackInfo.isLiveContent});
 }
 
 function isUrl(url) {
-    return url.includes('http') || url.includes('youtube') || url.includes('soundcloud');
+    return url.includes('http') || url.includes('youtube');
 }
-
-function stopPlayer() {
-    if(connection){
-        connection.destroy();
-        connection = undefined;
-    }
-}
-
-function stopClient() {
-    client.destroy();
-    process.exit();
-}
-
-async function startPlayer(message) {
-    queue = player.createQueue(message.guild, {
-        metadata: {
-            channel: message.channel
-        }
-    });
-    connection = await queue.connect(message.member.voice.channel);
-
-    const name = await ytdl.getInfo('https://www.youtube.com/watch?v=w3LWHIz3bMc').then(info => info.videoDetails.title);
-    const track = new Track(player, { title: name, url: 'https://www.youtube.com/watch?v=w3LWHIz3bMc', source: 'youtube'});
-
-    await queue.play(track);
-}
-
-// player.on('queueEnd', queue => {
-//     queue.play();
-// });
 
 player.on("trackEnd", queue => {
 
@@ -247,4 +218,4 @@ client.once("ready", () => {
 client.login(token);
 
 // TODO: fix: connection destroy null exceptions, restart radio onerror, add: player controls, playlists, radios, find track, fix connect timeout error
-// TODO: fix multi word track names detecting, add normal crumber (not lower links and track names)
+// TODO: fix multi word track names detecting, add normal crumber (not lower links and track names), fix play restart mute
