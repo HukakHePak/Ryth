@@ -36,18 +36,19 @@ const BOT = {
             HELLO(userName) { return 'Hi ' + userName + ', glad to see you! 😄'},
         },
         OWNER: {
-            PLAY: 'Oh, yes, my overlord',
+            PLAY: 'Oh, yes, my master',
         },
         PLAYER: {
             START(title) { return `🎶 | Now playing **${title}**!`; },
             STOP: 'Player stopped',
         },
-        DREAM: 'Bye ☺️',
+        DREAM: 'Bye ☺️☺️☺️',
         BANANA: '💦',
         HELP: '',
 
     },
     COMMANDS: ['play', 'skip', 'stop', 'back', 'to', 'remove', 'skip', 'list', 'help', 'dream'],
+
     GUILD: {
         QUEUE: undefined,
         LIST: undefined,
@@ -58,7 +59,7 @@ const BOT = {
 function parseContent(content) {
     let crumbs = content.trim().split(' ');
     const botName = crumbs[0].toLowerCase();
-    let command = crumbs[1].toLowerCase();
+    let command = crumbs[1] ? crumbs[1].toLowerCase() : undefined;
     let trackName = crumbs[2];
 
     if(!BOT.COMMANDS.includes(command)) {
@@ -67,6 +68,7 @@ function parseContent(content) {
             return crumb !== BOT.NAME && !isUrl(crumb);
         }).join(' ');
     }
+
     const url = crumbs.find(isUrl);
 
     return { botName, command, trackName, url };
@@ -75,10 +77,7 @@ function parseContent(content) {
 async function messageReact(message) {
     if (message.author.bot) return;
 
-    const userName = message.author.username;
     const crumbs = parseContent(message.content);
-
-    console.log(crumbs);
 
     switch (crumbs.botName) {
         case BOT.NAME:
@@ -89,7 +88,8 @@ async function messageReact(message) {
             break;
 
         case 'hi,':
-            if(message.content.includes(BOT.NAME)) message.reply(BOT.PHRASE.MEMBER.HELLO(userName));
+            if(message.content.toLowerCase().includes(BOT.NAME))
+                message.reply(BOT.PHRASE.MEMBER.HELLO(message.author.username));
             break;
     }
 }
@@ -105,37 +105,42 @@ async function managePlayer(message, { command, trackName, url }) {
 
         case 'stop':
             queue.stop();
-            queue.jump(0);
+            //queue.jump(0);
             // if(connection)  {
             //     stopPlayer();
             //     message.reply(BOT.PHRASE.PLAYER.STOP)
             // }
             return;
 
-        // case 'pause':
-        //    queue.stop();
-        //     return;
+        case 'pause':
+            queue.setPaused(true);
+            return;
 
         case 'skip':
             queue.skip();
             return;
 
         case 'back':
-            queue.back();
+            try { queue.back(); } catch { }
             return;
 
         case 'to':
-            queue.jump(trackName);
+            //typeof trackName === 'number' ? trackName find track in queue
+            //queue.jump();
             return;
 
         case 'remove':
-            queue.remove(trackName);
+            //queue.remove(trackName);
             //radios.filter()
             return;
 
         case 'list':
-            // queue.tracks.forEach( track => console.log(track.title) );
-            // console.log(queue.tracks);
+             let trackList = '';
+             let count = 0;
+
+             queue.previousTracks.forEach( track => trackList += count++ + ' | ' + track.title + '\n' );
+
+             if(trackList) message.reply(trackList);
             return;
 
         case 'help':
@@ -181,11 +186,10 @@ async function managePlayer(message, { command, trackName, url }) {
         }
     }
 
-
 }
 
 function isUrl(url) {
-    return url.includes('http') || url.includes('youtube');
+    return url.includes('http') || url.includes('youtube') || url.includes('soundcloud');
 }
 
 function stopPlayer() {
