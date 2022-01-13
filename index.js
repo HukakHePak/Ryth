@@ -50,7 +50,7 @@ const BOT = {
     },
     COMMANDS: ['play', 'skip', 'stop', 'back', 'to', 'remove', 'skip', 'list', 'help', 'dream'],
     DEFAULT: {
-        TRACK: createTrack('https://www.youtube.com/watch?v=w3LWHIz3bMc', 'anime'),
+        TRACK_URL: 'https://www.youtube.com/watch?v=w3LWHIz3bMc',
     },
 
     PLAYLIST: new Map,
@@ -87,9 +87,7 @@ async function messageReact(message) {
                 return;
             }
 
-            if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
-
-            if(!BOT.QUEUE) BOT.QUEUE = BOT.PLAYER.createQueue(message.guild, { repeatMode: 2 });
+            if(!BOT.QUEUE) BOT.QUEUE = BOT.PLAYER.createQueue(message.guild, { metadata: { channel: message.channel }, repeatMode: 2 });
 
             managePlayer(message, crumbs);
             break;
@@ -101,6 +99,9 @@ async function messageReact(message) {
         case 'hi,':
             if(message.content.toLowerCase().includes(BOT.NAME))
                 message.reply(BOT.PHRASE.MEMBER.HELLO(message.author.username));
+            break;
+        case 'inf':
+            //console.log(BOT.DEFAULT.TRACK);
             break;
     }
 }
@@ -151,12 +152,22 @@ async function managePlayer(message, { command, title, url }) {
             return;
 
         case 'play':
+            if(!queue.connection) await queue.connect(message.member.voice.channel);
+
+            if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
+
+            if(!queue.tracks.size) {
+                queue.clear();
+                queue.play(await createTrack(BOT.DEFAULT.TRACK_URL));
+                return;
+            }
+
             if(playlist.size) {
                 queue.addTracks(Array.from(playlist.values()));
-                queue.play();
             }
-            await queue.play(queue.tracks.size ? undefined : BOT.DEFAULT.TRACK);
+            queue.play();
 
+            return;
     }
 
     if(!queue.connection) await queue.connect(message.member.voice.channel);
@@ -164,7 +175,7 @@ async function managePlayer(message, { command, title, url }) {
     let track = undefined;
 
     if(url) {
-        track = createTrack(url);
+        track = await createTrack(url);
 
         if(title) {
             playlist.set(title, track);
@@ -182,22 +193,23 @@ async function managePlayer(message, { command, title, url }) {
     }
 
     queue.addTrack(track);
+    queue.play();
 }
 
 async function createTrack(url) {
     const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
-    return new Track(player, { title: trackInfo.title, url, source: 'youtube', live: trackInfo.isLiveContent});
+    return new Track(BOT.PLAYER, { title: trackInfo.title, url, source: 'youtube' });
 }
 
 function isUrl(url) {
     return url.includes('http') || url.includes('youtube');
 }
 
-player.on("trackEnd", queue => {
+BOT.PLAYER.on("trackEnd", queue => {
 
 });
 
-player.on("trackStart", (queue, track) =>
+BOT.PLAYER.on("trackStart", (queue, track) =>
     queue.metadata.channel.send(BOT.PHRASE.PLAYER.START(track.title))
 );
 
