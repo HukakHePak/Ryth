@@ -181,8 +181,11 @@ async function managePlayer(message, { command, title, url }) {
             let trackList = '';
             let count = 0;
 
+            console.log('///////////tracks///////////');
+
             BOT.PLAYLIST.forEach( (track, name) => {
                 trackList += ++count + `\t|\t**${name}**` + (track.raw.duration ? '' : '\t/\tradio') + '\n';
+                console.log(track);
             });
 
             if(trackList) message.reply(trackList);
@@ -227,8 +230,8 @@ async function managePlayer(message, { command, title, url }) {
 }
 
 async function createTrack(url) {
-    //const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
-    return new Track(BOT.PLAYER, { title: (await ytdl.getInfo(url).then(info => info.videoDetails)).title, url, source: 'youtube' });
+    const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
+    return new Track(BOT.PLAYER, { title: trackInfo.title, url, source: 'youtube', duration: trackInfo.lengthSeconds });
 }
 
 function isUrl(url) {
@@ -273,6 +276,3 @@ client.once("ready", () => {
 });
 
 client.login(token);
-
-// TODO: fix: connection destroy null exceptions, restart radio onerror, add: player controls, playlists, radios, find track, fix connect timeout error
-// TODO: fix multi word track names detecting, add normal crumber (not lower links and track names), fix play restart mute
