@@ -1,17 +1,7 @@
-const { Client, Intents, VoiceChannel} = require('discord.js');
+const { Client, Intents } = require('discord.js');
 const { token } = require('./config.json');
-//const { createReadStream, createWriteStream } = require('fs');
-//const play = require('play-dl');
 const ytdl = require('ytdl-core');
 const { Player, Track } = require("discord-player");
-// const { createAudioPlayer,
-//     NoSubscriberBehavior,
-//     joinVoiceChannel,
-//     createAudioResource,
-//     getVoiceConnection,
-//     getGroups,
-//     StreamType
-// } = require('@discordjs/voice');
 
 const client = new Client({ intents: [Intents.FLAGS.GUILDS,
         Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
@@ -52,7 +42,7 @@ const BOT = {
     },
     COMMANDS: ['play', 'skip', 'pause', 'stop', 'back', 'to', 'remove', 'skip', 'list', 'help', 'dream', 'add'],
     DEFAULT: {
-        TRACK_URL: 'https://www.youtube.com/watch?v=w3LWHIz3bMc',
+        TRACK_URL: 'https://www.youtube.com/watch?v=Un8KYOf6x9U',
     },
 
     PLAYLIST: new Map(),
