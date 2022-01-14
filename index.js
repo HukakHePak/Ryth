@@ -34,7 +34,8 @@ const BOT = {
         PLAYER: {
             START(title) { return `🎶 | Now playing **${title}**!`; },
             STOP: 'Player stopped',
-            PLAY: 'Player always play'
+            PLAY: 'Player always play',
+            ADD: 'Track added on queue',
         },
         VOICE: {
             DISCONNECT:'Not connect to voice',
@@ -102,9 +103,6 @@ async function messageReact(message) {
             if(message.content.toLowerCase().includes(BOT.NAME))
                 message.reply(BOT.PHRASE.MEMBER.HELLO(message.author.username));
             break;
-        case 'inf':
-            //console.log(BOT.DEFAULT.TRACK);
-            break;
     }
 }
 
@@ -128,9 +126,7 @@ async function managePlayer(message, { command, title, url }) {
             case 'to':
                 if (+title <= BOT.PLAYLIST.size) {
                     const tracks = (Array.from(BOT.PLAYLIST.values())).slice(+title - 1);
-                    console.log(tracks);
                     queue.clear();
-                    console.log('/////////to//////////');
                     queue.addTracks(tracks);
                     queue.play();
                 }
@@ -186,7 +182,6 @@ async function managePlayer(message, { command, title, url }) {
             BOT.PLAYLIST.delete(title);
             return;
 
-
         case 'list':
             if( !BOT.PLAYLIST.size) {
                 message.reply(BOT.PHRASE.TRACK.LIST_EMPTY);
@@ -196,8 +191,9 @@ async function managePlayer(message, { command, title, url }) {
             let trackList = '';
             let count = 0;
 
-            BOT.PLAYLIST.forEach( (track, name) => trackList += ++count + `\t|\t**${name}**\n` +
-                + (track.raw.live ? '\t|\tradio' : '\ttest') );
+            BOT.PLAYLIST.forEach( (track, name) => {
+                trackList += ++count + `\t|\t**${name}**` + (track.raw.duration ? '' : '\t/\tradio') + '\n';
+            });
 
             if(trackList) message.reply(trackList);
             return;
@@ -219,61 +215,54 @@ async function managePlayer(message, { command, title, url }) {
     if(command) return;
 
     if(!queue.connection) await queue.connect(message.member.voice.channel);
-    let track = undefined;
 
     if(url) {
-        track = await createTrack(url);
+        const track = await createTrack(url);
 
-        if(title) {
-            BOT.PLAYLIST.set(title, track);
-            queue.play(track);
-            console.log('url + title');
-            return;
-        }
-        console.log('url');
+        if(title) BOT.PLAYLIST.set(title, track);
+
+        queue.play(track);
+        return;
     }
 
     if(title) {
-        track = BOT.PLAYLIST.get(title);
-        console.log('title');
+        let track = BOT.PLAYLIST.get(title);
+
         if(!track) {
             track = await BOT.PLAYER.search(title, {requestedBy: message.author}).then(response => response.tracks[0]);
-            console.log('search');
         }
+
+        queue.play(track);
     }
-
-    queue.play(track);
-
-    //queue.addTrack(track);
-    //if(!queue.playing)
-    //queue.playing ? queue.play(track) : queue.play();
 }
 
 async function createTrack(url) {
-    const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
-    return new Track(BOT.PLAYER, { title: trackInfo.title, url, source: 'youtube', live: trackInfo.isLiveContent });
+    //const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
+    return new Track(BOT.PLAYER, { title: (await ytdl.getInfo(url).then(info => info.videoDetails)).title, url, source: 'youtube' });
 }
 
 function isUrl(url) {
     return url.includes('http') || url.includes('youtube');
 }
 
-BOT.PLAYER.on("queueEnd", queue => {
+BOT.PLAYER.on("connectionError", queue => {
     const track = queue.previousTracks[0];
-    console.log(track.title);
-    if (!track) return;
-
-    if(track.raw.live) {//.raw.live) {
-        //BOT.QUEUE = BOT.PLAYER.createQueue(queue.guild, { metadata: { channel: queue.channel }, repeatMode: 2 });
+    if(!track.raw.duration) {
         queue.play(track);
         console.log('live restarted');
-        return;
     }
-    //console.log()
-
-    //queue.addTracks(Array.from(BOT.PLAYLIST.values()));
-    //queue.play();
 });
+
+BOT.PLAYER.on("queueEnd", queue => {
+    if (BOT.PLAYLIST.size) {
+        queue.addTracks(Array.from(BOT.PLAYLIST.values()));
+        queue.play();
+    }
+});
+
+BOT.PLAYER.on("trackAdd", (queue, track) =>
+    queue.metadata.channel.send(BOT.PHRASE.PLAYER.ADD)
+);
 
 BOT.PLAYER.on("trackStart", (queue, track) =>
     queue.metadata.channel.send(BOT.PHRASE.PLAYER.START(track.raw.title))
