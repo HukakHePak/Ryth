@@ -31,7 +31,7 @@ const BOT = {
         MEMBER: {
             JOIN: 'Congratulations and welcome to the server! I believe that a strong group of People can do much more together and surpass what an individual can do alone',
             LEAVE: 'We have lost a worthy fighter. Rest in peace...',
-            HELLO(userName) { return 'Hi ' + userName + ', glad to see you! 😄'},
+            HELLO(userName) { return 'Hi, **' + userName + '**, glad to see you! 😄'},
         },
         OWNER: {
             PLAY: 'Oh, yes, my **master**',
@@ -39,6 +39,7 @@ const BOT = {
         PLAYER: {
             START(title) { return `🎶 | Now playing **${title}**!`; },
             STOP: 'Player stopped',
+            PLAY: 'Player always play'
         },
         VOICE: {
             DISCONNECT:'Not connect to voice',
@@ -53,7 +54,7 @@ const BOT = {
         HELP: 'Do you need a help? Ha-ha!',
 
     },
-    COMMANDS: ['play', 'skip', 'stop', 'back', 'to', 'remove', 'skip', 'list', 'help', 'dream', 'add'],
+    COMMANDS: ['play', 'skip', 'pause', 'stop', 'back', 'to', 'remove', 'skip', 'list', 'help', 'dream', 'add'],
     DEFAULT: {
         TRACK_URL: 'https://www.youtube.com/watch?v=w3LWHIz3bMc',
     },
@@ -114,30 +115,11 @@ async function messageReact(message) {
 
 async function managePlayer(message, { command, title, url }) {
     const queue = BOT.QUEUE;
-    const playlist = BOT.PLAYLIST;
 
     if(queue.playing) {
         switch (command) {
-            case 'stop':
-                queue.stop();
-                //console.log(BOT.QUEUE);
-                //queue.connection = undefined;
-                return;
-
             case 'pause':
                 queue.setPaused(true);
-                return;
-
-            case 'remove':
-                playlist.delete(title);
-                return;
-
-            case 'add':
-                const track = queue.current;
-                if (track) return;
-
-                playlist.set(title ? title : track.title, track);
-                console.log(playlist)
                 return;
 
             case 'skip':
@@ -145,20 +127,23 @@ async function managePlayer(message, { command, title, url }) {
                 return;
 
             case 'back':
-                if (queue.previousTracks.length) queue.back();
+                if (queue.previousTracks.length > 1) queue.back();
                 return;
 
             case 'to':
-                if (+title < queue.tracks.length) queue.jump(+title);
+                if (+title < queue.tracks.length) queue.jump(+title - 1);
                 return;
 
             case 'play':
                 if(queue.connection.paused) queue.setPaused(false);
                 return;
+
+            case 'add':
+                const track = queue.tracks? queue.tracks[queue.tracks - 1] : queue.current;
+                if (track) BOT.PLAYLIST.set(title ? title : track.title, track);
+                return;
         }
     }
-    console.log(queue.playing);
-    console.log(queue.destroyed);
 
     switch (command) {
         case 'play':
@@ -166,32 +151,45 @@ async function managePlayer(message, { command, title, url }) {
 
             if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
 
+            if(BOT.PLAYLIST.size) {
+                queue.addTracks(Array.from(BOT.PLAYLIST.values()));
+                queue.play();
+                return;
+            }
+
             if(!queue.tracks.length) {
                 queue.play(await createTrack(BOT.DEFAULT.TRACK_URL));
                 return;
             }
 
-            if(playlist.size) {
-                queue.addTracks(Array.from(playlist.values()));
-            }
-
-            queue.play();
+            message.reply(BOT.PHRASE.PLAYER.PLAY);
             return;
 
-        case 'list':
-            if( !playlist.size) {
-                message.reply(BOT.PHRASE.TRACK.LIST_EMPTY);
-                //return;
+        case 'stop':
+            if(queue.connection) queue.stop();
+            return;
+
+        case 'remove':
+            if(+title) {
+                const key = Array.from(BOT.PLAYLIST.keys())[+title - 1];
+                BOT.PLAYLIST.delete(key);
+                return;
             }
 
-            let test = new Map();
-            test.set('t', 't')
-            console.log(test);
+            BOT.PLAYLIST.delete(title);
+            return;
+
+
+        case 'list':
+            if( !BOT.PLAYLIST.size) {
+                message.reply(BOT.PHRASE.TRACK.LIST_EMPTY);
+                return;
+            }
 
             let trackList = '';
             let count = 0;
 
-            playlist.forEach( track => trackList += count++ + ' | ' + track.title + '\n' );
+            BOT.PLAYLIST.forEach( track => trackList += count++ + '\t|\t' + track.title + '\n' );
 
             if(trackList) message.reply(trackList);
             return;
@@ -210,33 +208,29 @@ async function managePlayer(message, { command, title, url }) {
             return;
     }
 
-    await queue.connect(message.member.voice.channel);
-
-    let track = undefined;
+    if(command) return;
 
     if(url) {
-        track = await createTrack(url);
+        await queue.connect(message.member.voice.channel);
+        const track = await createTrack(url);
 
         if(title) {
-            playlist.set(title, track);
+            BOT.PLAYLIST.set(title, track);
             queue.clear();
             queue.play(track);
             return;
         }
-
-        queue.addTrack(track);
-        queue.play();
     }
 
     if(title) {
-        track = BOT.PLAYLIST.get(title);
+        await queue.connect(message.member.voice.channel);
+        let track = BOT.PLAYLIST.get(title);
 
         if(!track)
             track = await BOT.PLAYER.search(title, { requestedBy: message.author }).then(response => response.tracks[0]);
-
-        queue.addTrack(track);
-        queue.play();
     }
+    queue.addTrack(track);
+    queue.play();
 }
 
 async function createTrack(url) {
@@ -249,11 +243,15 @@ function isUrl(url) {
 }
 
 BOT.PLAYER.on("trackEnd", (queue, track) => {
-    if(track.raw.live) queue.play(track);
+    if(track.raw.live) {
+        BOT.QUEUE = BOT.PLAYER.createQueue(queue.guild, { metadata: { channel: queue.channel }, repeatMode: 2 });
+        BOT.QUEUE.play(track);
+        console.log('track restarted');
+    }
 });
 
 BOT.PLAYER.on("trackStart", (queue, track) =>
-    queue.metadata.channel.send(BOT.PHRASE.PLAYER.START(track.title))
+    queue.metadata.channel.send(BOT.PHRASE.PLAYER.START(track.raw.title))
 );
 
 client.on('messageCreate', messageReact);
