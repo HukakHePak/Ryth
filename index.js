@@ -181,11 +181,8 @@ async function managePlayer(message, { command, title, url }) {
             let trackList = '';
             let count = 0;
 
-            console.log('///////////tracks///////////');
-
             BOT.PLAYLIST.forEach( (track, name) => {
                 trackList += ++count + `\t|\t**${name}**` + (track.raw.duration ? '' : '\t/\tradio') + '\n';
-                console.log(track);
             });
 
             if(trackList) message.reply(trackList);
