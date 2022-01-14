@@ -19,11 +19,6 @@ const client = new Client({ intents: [Intents.FLAGS.GUILDS,
         Intents.FLAGS.GUILD_VOICE_STATES],
 });
 
-// let connection = undefined;
-// let queue = undefined;
-//
-// const player = new Player(client);
-
 const BOT = {
     NAME: 'ryth',
     OWNER: 'Hukak He Pak',
@@ -94,7 +89,7 @@ async function messageReact(message) {
             }
 
             if(!BOT.QUEUE || BOT.QUEUE.destroyed)
-                BOT.QUEUE = BOT.PLAYER.createQueue(message.guild, { metadata: { channel: message.channel }, repeatMode: 2 });
+                BOT.QUEUE = BOT.PLAYER.createQueue(message.guild, { metadata: { channel: message.channel }, leaveOnEnd: false });
 
             managePlayer(message, crumbs);
             break;
@@ -131,7 +126,14 @@ async function managePlayer(message, { command, title, url }) {
                 return;
 
             case 'to':
-                if (+title < queue.tracks.length) queue.jump(+title - 1);
+                if (+title <= BOT.PLAYLIST.size) {
+                    const tracks = (Array.from(BOT.PLAYLIST.values())).slice(+title - 1);
+                    console.log(tracks);
+                    queue.clear();
+                    console.log('/////////to//////////');
+                    queue.addTracks(tracks);
+                    queue.play();
+                }
                 return;
 
             case 'play':
@@ -139,7 +141,7 @@ async function managePlayer(message, { command, title, url }) {
                 return;
 
             case 'add':
-                const track = queue.tracks? queue.tracks[queue.tracks - 1] : queue.current;
+                const track = queue.current;
                 if (track) BOT.PLAYLIST.set(title ? title : track.title, track);
                 return;
         }
@@ -147,7 +149,12 @@ async function managePlayer(message, { command, title, url }) {
 
     switch (command) {
         case 'play':
-            await queue.connect(message.member.voice.channel);
+            try {
+                await queue.connect(message.member.voice.channel);
+            } catch {
+                console.log('Can\'t connect to voice');
+                return;
+            }
 
             if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
 
@@ -189,7 +196,8 @@ async function managePlayer(message, { command, title, url }) {
             let trackList = '';
             let count = 0;
 
-            BOT.PLAYLIST.forEach( track => trackList += count++ + '\t|\t' + track.title + '\n' );
+            BOT.PLAYLIST.forEach( (track, name) => trackList += ++count + `\t|\t**${name}**\n` +
+                + (track.raw.live ? '\t|\tradio' : '\ttest') );
 
             if(trackList) message.reply(trackList);
             return;
@@ -210,44 +218,61 @@ async function managePlayer(message, { command, title, url }) {
 
     if(command) return;
 
+    if(!queue.connection) await queue.connect(message.member.voice.channel);
+    let track = undefined;
+
     if(url) {
-        await queue.connect(message.member.voice.channel);
-        const track = await createTrack(url);
+        track = await createTrack(url);
 
         if(title) {
             BOT.PLAYLIST.set(title, track);
-            queue.clear();
             queue.play(track);
+            console.log('url + title');
             return;
         }
+        console.log('url');
     }
 
     if(title) {
-        await queue.connect(message.member.voice.channel);
-        let track = BOT.PLAYLIST.get(title);
-
-        if(!track)
-            track = await BOT.PLAYER.search(title, { requestedBy: message.author }).then(response => response.tracks[0]);
+        track = BOT.PLAYLIST.get(title);
+        console.log('title');
+        if(!track) {
+            track = await BOT.PLAYER.search(title, {requestedBy: message.author}).then(response => response.tracks[0]);
+            console.log('search');
+        }
     }
-    queue.addTrack(track);
-    queue.play();
+
+    queue.play(track);
+
+    //queue.addTrack(track);
+    //if(!queue.playing)
+    //queue.playing ? queue.play(track) : queue.play();
 }
 
 async function createTrack(url) {
     const trackInfo = await ytdl.getInfo(url).then(info => info.videoDetails);
-    return new Track(BOT.PLAYER, { title: trackInfo.title, url, source: 'youtube' });
+    return new Track(BOT.PLAYER, { title: trackInfo.title, url, source: 'youtube', live: trackInfo.isLiveContent });
 }
 
 function isUrl(url) {
     return url.includes('http') || url.includes('youtube');
 }
 
-BOT.PLAYER.on("trackEnd", (queue, track) => {
-    if(track.raw.live) {
-        BOT.QUEUE = BOT.PLAYER.createQueue(queue.guild, { metadata: { channel: queue.channel }, repeatMode: 2 });
-        BOT.QUEUE.play(track);
-        console.log('track restarted');
+BOT.PLAYER.on("queueEnd", queue => {
+    const track = queue.previousTracks[0];
+    console.log(track.title);
+    if (!track) return;
+
+    if(track.raw.live) {//.raw.live) {
+        //BOT.QUEUE = BOT.PLAYER.createQueue(queue.guild, { metadata: { channel: queue.channel }, repeatMode: 2 });
+        queue.play(track);
+        console.log('live restarted');
+        return;
     }
+    //console.log()
+
+    //queue.addTracks(Array.from(BOT.PLAYLIST.values()));
+    //queue.play();
 });
 
 BOT.PLAYER.on("trackStart", (queue, track) =>
