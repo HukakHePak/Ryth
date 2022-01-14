@@ -1,12 +1,11 @@
 {
-  "name": "c",
+  "name": "ryth",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Hukak He Pak",
   "license": "ISC",
   "dependencies": {
     "@discordjs/builders": "^0.11.0",
@@ -21,5 +20,8 @@
     "play-dl": "^1.7.0",
     "ytdl-core": "^4.10.0"
   },
-  "description": ""
+  "description": "pretty pink music girl",
+  "engines": {
+    "node": "16.x"
+  }
 }
