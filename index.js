@@ -281,4 +281,4 @@ client.once("ready", () => {
     console.log("I'm ready!");
 });
 
-client.login(process.env.TEST_TOKEN);
+client.login(process.env.BOT_TOKEN);
