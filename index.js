@@ -1,5 +1,5 @@
+require('dotenv').config();
 const { Client, Intents } = require('discord.js');
-const { token } = require('./config.json');
 const ytdl = require('ytdl-core');
 const { Player, Track } = require("discord-player");
 
@@ -272,4 +272,4 @@ client.once("ready", () => {
     console.log("I'm ready!");
 });
 
-client.login(token);
+client.login(process.env.BOT_TOKEN);
