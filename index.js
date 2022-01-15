@@ -10,8 +10,8 @@ const client = new Client({ intents: [Intents.FLAGS.GUILDS,
 });
 
 const BOT = {
-    NAME: 'ryth',
-    OWNER: 'Hukak He Pak',
+    NAME: process.env.BOT_NAME,
+    OWNER: process.env.BOT_OWNER,
     PHRASE: {
         MEMBER: {
             JOIN: 'Congratulations and welcome to the server! I believe that a strong group of People can do much more together and surpass what an individual can do alone',
@@ -37,12 +37,21 @@ const BOT = {
         },
         DREAM: 'Bye ☺️☺️☺️',
         BANANA: '💦',
-        HELP: 'Do you need a help? Ha-ha!',
+        HELP: 'ryth play - connect to voice and start list \n'
+        + 'ryth < track > - add track from list in queue or search on youtube \n'
+        + 'ryth < url > - add track from url in queue\n'
+        + 'ryth < url > < name > - add named track from url in list\n'
+        + 'ryth add < name > - add named track from player in list\n'
+        + 'ryth add - add track with default name\n'
+        + 'ryth list - show list tracks\n'
+        + 'ryth remove < id / name > - remove track from list\n'
+        + 'ryth to < id / name > - play current track from list\n'
+        + 'ryth stop / pause / skip / back / help',
 
     },
     COMMANDS: ['play', 'skip', 'pause', 'stop', 'back', 'to', 'remove', 'skip', 'list', 'help', 'dream', 'add'],
     DEFAULT: {
-        TRACK_URL: 'https://www.youtube.com/watch?v=Un8KYOf6x9U',
+        TRACK_URL: process.env.DEFAULT_TRACK_URL,
     },
 
     PLAYLIST: new Map(),
@@ -272,4 +281,4 @@ client.once("ready", () => {
     console.log("I'm ready!");
 });
 
-client.login(process.env.BOT_TOKEN);
+client.login(process.env.TEST_TOKEN);
