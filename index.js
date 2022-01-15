@@ -83,10 +83,6 @@ async function messageReact(message) {
 
     switch (crumbs.botName) {
         case BOT.NAME:
-            if(!message.member.voice.channel) {
-                message.reply(BOT.PHRASE.VOICE.DISCONNECT);
-                return;
-            }
 
             if(!BOT.QUEUE || BOT.QUEUE.destroyed)
                 BOT.QUEUE = BOT.PLAYER.createQueue(message.guild, { metadata: { channel: message.channel }, leaveOnEnd: false });
@@ -108,7 +104,7 @@ async function messageReact(message) {
 async function managePlayer(message, { command, title, url }) {
     const queue = BOT.QUEUE;
 
-    if(queue.playing) {
+    if (queue.playing) {
         switch (command) {
             case 'pause':
                 queue.setPaused(true);
@@ -132,7 +128,7 @@ async function managePlayer(message, { command, title, url }) {
                 return;
 
             case 'play':
-                if(queue.connection.paused) queue.setPaused(false);
+                if (queue.connection.paused) queue.setPaused(false);
                 return;
 
             case 'add':
@@ -141,38 +137,9 @@ async function managePlayer(message, { command, title, url }) {
                 return;
         }
     }
-
     switch (command) {
-        case 'play':
-            try {
-                await queue.connect(message.member.voice.channel);
-            } catch {
-                console.log('Can\'t connect to voice');
-                return;
-            }
-
-            if(message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
-
-            if(BOT.PLAYLIST.size) {
-                queue.addTracks(Array.from(BOT.PLAYLIST.values()));
-                queue.play();
-                return;
-            }
-
-            if(!queue.tracks.length) {
-                queue.play(await createTrack(BOT.DEFAULT.TRACK_URL));
-                return;
-            }
-
-            message.reply(BOT.PHRASE.PLAYER.PLAY);
-            return;
-
-        case 'stop':
-            if(queue.connection) queue.stop();
-            return;
-
         case 'remove':
-            if(+title) {
+            if (+title) {
                 const key = Array.from(BOT.PLAYLIST.keys())[+title - 1];
                 BOT.PLAYLIST.delete(key);
                 return;
@@ -182,7 +149,7 @@ async function managePlayer(message, { command, title, url }) {
             return;
 
         case 'list':
-            if( !BOT.PLAYLIST.size) {
+            if (!BOT.PLAYLIST.size) {
                 message.reply(BOT.PHRASE.TRACK.LIST_EMPTY);
                 return;
             }
@@ -190,11 +157,11 @@ async function managePlayer(message, { command, title, url }) {
             let trackList = '';
             let count = 0;
 
-            BOT.PLAYLIST.forEach( (track, name) => {
+            BOT.PLAYLIST.forEach((track, name) => {
                 trackList += ++count + `\t|\t**${name}**` + (track.raw.duration ? '' : '\t/\tradio') + '\n';
             });
 
-            if(trackList) message.reply(trackList);
+            if (trackList) message.reply(trackList);
             return;
 
         case 'help':
@@ -202,37 +169,70 @@ async function managePlayer(message, { command, title, url }) {
             return;
 
         case 'dream':
-            if(message.author.username === BOT.OWNER) {
+            if (message.author.username === BOT.OWNER) {
                 await message.reply(BOT.PHRASE.DREAM);
-                if(queue.playing) queue.stop();
+                if (queue.playing) queue.stop();
                 client.destroy();
                 process.exit();
             }
             return;
     }
 
-    if(command) return;
+    if (message.member.voice.channel) {
+        switch (command) {
+            case 'play':
+                try {
+                    await queue.connect(message.member.voice.channel);
+                } catch {
+                    console.log('Can\'t connect to voice');
+                    return;
+                }
 
-    if(!queue.connection) await queue.connect(message.member.voice.channel);
+                if (message.author.username === BOT.OWNER) message.reply(BOT.PHRASE.OWNER.PLAY);
 
-    if(url) {
-        const track = await createTrack(url);
+                if (BOT.PLAYLIST.size) {
+                    queue.addTracks(Array.from(BOT.PLAYLIST.values()));
+                    queue.play();
+                    return;
+                }
 
-        if(title) BOT.PLAYLIST.set(title, track);
+                if (!queue.tracks.length) {
+                    queue.play(await createTrack(BOT.DEFAULT.TRACK_URL));
+                    return;
+                }
 
-        queue.play(track);
-        return;
-    }
+                message.reply(BOT.PHRASE.PLAYER.PLAY);
+                return;
 
-    if(title) {
-        let track = BOT.PLAYLIST.get(title);
-
-        if(!track) {
-            track = await BOT.PLAYER.search(title, {requestedBy: message.author}).then(response => response.tracks[0]);
+            case 'stop':
+                if (queue.connection) queue.stop();
+                return;
         }
 
-        queue.play(track);
-    }
+        if (command) return;
+
+        if (!queue.connection) await queue.connect(message.member.voice.channel);
+
+        if (url) {
+            const track = await createTrack(url);
+
+            if (title) BOT.PLAYLIST.set(title, track);
+
+            queue.play(track);
+            return;
+        }
+
+        if (title) {
+            let track = BOT.PLAYLIST.get(title);
+
+            if (!track) {
+                track = await BOT.PLAYER.search(title, {requestedBy: message.author}).then(response => response.tracks[0]);
+            }
+
+            queue.play(track);
+        }
+    } else
+        message.reply(BOT.PHRASE.VOICE.DISCONNECT);
 }
 
 async function createTrack(url) {
